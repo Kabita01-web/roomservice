@@ -67,8 +67,8 @@ Route::get('/terms-conditions',function(){
 Route::get('/contact',function(){
     return Inertia::render('MainPages/Contact');
 });
-Route::get('/requirement',function(){
-    return Inertia::render('MainPages/Requirement');
+Route::get('/help',function(){
+    return Inertia::render('MainPages/Help');
 });
 Route::get('/about',function(){
     return Inertia::render('MainPages/About');

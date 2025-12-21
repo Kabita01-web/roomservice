@@ -210,9 +210,7 @@ function NavBar() {
           <Link href="/about" className={navLinkClass()}>
             About
           </Link>
-          <Link href="/requirement" className={navLinkClass()}>
-            Requirements
-          </Link>
+          
         </nav>
 
         {/* Desktop Buttons - Updated with Auth Logic */}
@@ -362,15 +360,7 @@ function NavBar() {
             About
           </Link>
 
-          <Link
-            href="/requirement"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`py-2 hover:opacity-80 transition-all duration-300 text-base font-medium ${
-              isScrolled ? "text-gray-900" : "text-white"
-            }`}
-          >
-            Requirement
-          </Link>
+        
 
           {/* Mobile Auth Section */}
           <div className="flex flex-col gap-3 pt-4 border-t border-gray-300/20">
