@@ -50,7 +50,7 @@ function Contact() {
       <NavBar />
       
       {/* Hero Section */}
-      <div className="relative h-[60vh] bg-[url('https://images.pexels.com/photos/2187605/pexels-photo-2187605.jpeg')] bg-cover bg-center flex items-center justify-center">
+      <div className="relative h-[60vh] bg-[url('https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg')] bg-cover bg-center flex items-center justify-center">
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 to-black/30"></div>
         <div className="relative flex flex-col items-center justify-center text-center z-10 px-4">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-6 tracking-tight">

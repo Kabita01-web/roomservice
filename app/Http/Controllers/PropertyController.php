@@ -4,11 +4,26 @@ namespace App\Http\Controllers;
 
 use App\Models\Property;
 use App\Models\PropertyImage;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 
 class PropertyController extends Controller
 {
+    /**
+     * Log activity helper
+     */
+    private function logActivity(string $title): void
+    {
+        ActivityLog::create([
+            'name'       => Auth::check() ? Auth::user()->name : 'Guest',
+            'ip_address' => request()->ip(),
+            'title'      => $title,
+        ]);
+    }
+
     /**
      * Display all properties with images
      */
@@ -19,16 +34,46 @@ class PropertyController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Properties fetched successfully',
-            'data' => $properties
+            'data' => $properties,
         ], 200);
     }
 
     /**
-     * Store a newly created property with single/multiple images
+     * Calendar page
+     */
+    public function testCalendar($slug)
+    {
+        try {
+            $property = Property::where('slug', $slug)->firstOrFail();
+
+            return Inertia::render('Booking/CalendarIntegration', [
+                'property' => $property,
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Property not found.',
+            ], 404);
+        }
+    }
+
+    /**
+     * Property details
+     */
+    public function showDetails($slug)
+    {
+        $room = Property::with('images')->where('slug', $slug)->firstOrFail();
+
+        return Inertia::render('MainPages/RoomDetails', [
+            'room' => $room,
+        ]);
+    }
+
+    /**
+     * Store property with images
      */
     public function store(Request $request)
     {
-        // Validate inputs
         $validated = $request->validate([
             'title'         => 'required|string|max:255',
             'description'   => 'nullable|string',
@@ -38,18 +83,12 @@ class PropertyController extends Controller
             'bedrooms'      => 'required|integer',
             'bathrooms'     => 'required|integer',
             'property_type' => 'required|string',
-
-            // Images
             'images'        => 'nullable|array',
-            'images.*'      => 'image|mimes:jpg,jpeg,png,webp|max:4096'
+            'images.*'      => 'image|mimes:jpg,jpeg,png,webp|max:4096',
         ]);
 
-        // Create property
         $property = Property::create($validated);
 
-        /* --------------------------------------------------------
-         |  Store Single or Multiple Images
-         -------------------------------------------------------- */
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $image) {
                 $path = $image->store('properties', 'public');
@@ -61,28 +100,30 @@ class PropertyController extends Controller
             }
         }
 
+        /** 🔹 Activity Log */
+        $this->logActivity('Created property: ' . $property->title);
+
         return response()->json([
-            'status' => true,
+            'status'  => true,
             'message' => 'Property created successfully',
-            'data' => Property::with('images')->find($property->id)
+            'data'    => Property::with('images')->find($property->id),
         ], 201);
     }
 
     /**
-     * Update property + add new images + delete selected images
+     * Update property + images
      */
     public function update(Request $request, $id)
     {
         $property = Property::find($id);
 
-        if (!$property) {
+        if (! $property) {
             return response()->json([
                 'status' => false,
-                'message' => 'Property not found'
+                'message' => 'Property not found',
             ], 404);
         }
 
-        // Validate
         $validated = $request->validate([
             'title'         => 'sometimes|required|string|max:255',
             'description'   => 'sometimes|nullable|string',
@@ -92,33 +133,27 @@ class PropertyController extends Controller
             'bedrooms'      => 'sometimes|required|integer',
             'bathrooms'     => 'sometimes|required|integer',
             'property_type' => 'sometimes|required|string',
-
-            // Images
             'images'        => 'nullable|array',
             'images.*'      => 'image|mimes:jpg,jpeg,png,webp|max:4096',
             'delete_images' => 'nullable|array',
-            'delete_images.*' => 'sometimes|integer'
+            'delete_images.*' => 'integer',
         ]);
 
-        // Update details
         $property->update($validated);
 
-        /* --------------------------------------------------------
-         |  Delete selected images
-         -------------------------------------------------------- */
+        // Delete selected images
         if ($request->has('delete_images')) {
             foreach ($request->delete_images as $imageId) {
                 $image = PropertyImage::find($imageId);
-                if ($image && $image->property_id == $property->id) {
+
+                if ($image && $image->property_id === $property->id) {
                     Storage::disk('public')->delete($image->image_path);
                     $image->delete();
                 }
             }
         }
 
-        /* --------------------------------------------------------
-         |  Add new images when updating
-         -------------------------------------------------------- */
+        // Add new images
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $image) {
                 $path = $image->store('properties', 'public');
@@ -130,65 +165,69 @@ class PropertyController extends Controller
             }
         }
 
+        /** 🔹 Activity Log */
+        $this->logActivity('Updated property: ' . $property->title);
+
         return response()->json([
-            'status' => true,
+            'status'  => true,
             'message' => 'Property updated successfully',
-            'data' => Property::with('images')->find($property->id)
+            'data'    => Property::with('images')->find($property->id),
         ], 200);
     }
 
     /**
-     * Delete full property + all images
+     * Delete property + images
      */
     public function destroy($id)
     {
         $property = Property::with('images')->find($id);
 
-        if (!$property) {
+        if (! $property) {
             return response()->json([
                 'status' => false,
-                'message' => 'Property not found'
+                'message' => 'Property not found',
             ], 404);
         }
 
-        // Delete images from storage
         foreach ($property->images as $img) {
             Storage::disk('public')->delete($img->image_path);
             $img->delete();
         }
 
-        // Delete property
+        /** 🔹 Activity Log */
+        $this->logActivity('Deleted property: ' . $property->title);
+
         $property->delete();
 
         return response()->json([
             'status' => true,
-            'message' => 'Property and related images deleted successfully'
+            'message' => 'Property and related images deleted successfully',
         ], 200);
     }
 
     /**
-     * Delete a single property image
+     * Delete single image
      */
     public function deleteImage($imageId)
     {
         $image = PropertyImage::find($imageId);
 
-        if (!$image) {
+        if (! $image) {
             return response()->json([
                 'status' => false,
-                'message' => 'Image not found'
+                'message' => 'Image not found',
             ], 404);
         }
 
-        // Remove from storage
         Storage::disk('public')->delete($image->image_path);
-
-        // Delete DB record
         $image->delete();
+
+        /** 🔹 Activity Log */
+        $this->logActivity('Deleted property image (ID: ' . $imageId . ')');
 
         return response()->json([
             'status' => true,
-            'message' => 'Image deleted successfully'
+            'message' => 'Image deleted successfully',
         ], 200);
     }
 }

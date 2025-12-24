@@ -5,6 +5,11 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <meta name="description" content="Gharbhada is your trusted partner in finding the perfect rental home. Explore our extensive listings, enjoy seamless booking, and experience exceptional customer service. Your ideal home awaits with Gharbhada.">
+        <meta name="keywords" content="rental homes, property listings, home rentals, online booking, rental services, Gharbhada">
+        <meta name="author" content="Gharbhada">
+
+        <!-- SEO Meta Tags -->
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

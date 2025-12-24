@@ -7,15 +7,13 @@ const Settings = () => {
   const [isEditingAddress, setIsEditingAddress] = useState(false)
   
   const [profileData, setProfileData] = useState({
-    firstName: 'Rafiqur',
-    lastName: 'Rahman',
+    fullName: 'Rafiqur Rahman',
     email: 'rafiqurrahman951@gmail.com',
     phone: '+09 345 366 66',
-    bio: 'Team Manager',
     country: 'United Kingdom',
     city: 'Leeds, East London',
-    postalCode: 'E8T 2356',
-    taxId: 'AS4565756'
+    streetCode: 'E8T 2356',
+    
   })
 
   const handleInputChange = (e) => {
@@ -46,9 +44,9 @@ const Settings = () => {
                 />
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">
-                    {profileData.firstName} {profileData.lastName}
+                    {profileData.fullName}
                   </h3>
-                  <p className="text-sm text-gray-500">{profileData.bio}</p>
+                  <p className="text-sm text-gray-500">Property owner</p>
                   <p className="text-xs text-gray-400">Leeds, United Kingdom</p>
                 </div>
               </div>
@@ -87,11 +85,11 @@ const Settings = () => {
 
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-xs text-gray-500 mb-2">First Name</label>
+                <label className="block text-xs text-gray-500 mb-2">Full Name</label>
                 <input 
                   type="text"
-                  name="firstName"
-                  value={profileData.firstName}
+                  name="fullName"
+                  value={profileData.fullName}
                   onChange={handleInputChange}
                   disabled={!isEditingPersonal}
                   className={`w-full text-sm text-gray-700 ${
@@ -102,21 +100,7 @@ const Settings = () => {
                 />
               </div>
               
-              <div>
-                <label className="block text-xs text-gray-500 mb-2">Last Name</label>
-                <input 
-                  type="text"
-                  name="lastName"
-                  value={profileData.lastName}
-                  onChange={handleInputChange}
-                  disabled={!isEditingPersonal}
-                  className={`w-full text-sm text-gray-700 ${
-                    isEditingPersonal 
-                      ? 'border-b border-gray-300 focus:border-blue-500 outline-none pb-1' 
-                      : 'border-none'
-                  }`}
-                />
-              </div>
+             
 
               <div>
                 <label className="block text-xs text-gray-500 mb-2">Email address</label>

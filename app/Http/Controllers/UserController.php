@@ -3,13 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
     /**
-     * Display all users.
+     * Log activity helper
+     */
+    private function logActivity(string $title): void
+    {
+        ActivityLog::create([
+            'name'       => Auth::check() ? Auth::user()->name : 'Guest',
+            'ip_address' => request()->ip(),
+            'title'      => $title,
+        ]);
+    }
+
+    /**
+     * Display all users
      */
     public function index()
     {
@@ -23,7 +37,7 @@ class UserController extends Controller
     }
 
     /**
-     * Store a new user.
+     * Store a new user
      */
     public function store(Request $request)
     {
@@ -37,11 +51,10 @@ class UserController extends Controller
 
         $imagePath = null;
 
-        // Handle Image Upload
+        // Handle image upload
         if ($request->hasFile('image')) {
 
-            // Ensure folder exists
-            if (!file_exists(public_path('users'))) {
+            if (! file_exists(public_path('users'))) {
                 mkdir(public_path('users'), 0777, true);
             }
 
@@ -59,6 +72,9 @@ class UserController extends Controller
             'image'    => $imagePath,
         ]);
 
+        /** 🔹 Activity Log */
+        $this->logActivity('Created user: ' . $user->name . ' (' . $user->email . ')');
+
         return response()->json([
             'status'  => true,
             'message' => 'User created successfully.',
@@ -67,7 +83,7 @@ class UserController extends Controller
     }
 
     /**
-     * Update an existing user.
+     * Update an existing user
      */
     public function update(Request $request, User $user)
     {
@@ -79,15 +95,13 @@ class UserController extends Controller
             'image'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048'
         ]);
 
-        // Handle Image Update
+        // Handle image update
         if ($request->hasFile('image')) {
 
-            // Ensure folder exists
-            if (!file_exists(public_path('users'))) {
+            if (! file_exists(public_path('users'))) {
                 mkdir(public_path('users'), 0777, true);
             }
 
-            // Delete old image
             if ($user->image && file_exists(public_path($user->image))) {
                 unlink(public_path($user->image));
             }
@@ -99,13 +113,16 @@ class UserController extends Controller
         }
 
         // Update password only if provided
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
             unset($validated['password']);
         }
 
         $user->update($validated);
+
+        /** 🔹 Activity Log */
+        $this->logActivity('Updated user: ' . $user->name . ' (' . $user->email . ')');
 
         return response()->json([
             'status'  => true,
@@ -115,14 +132,16 @@ class UserController extends Controller
     }
 
     /**
-     * Delete a user.
+     * Delete a user
      */
     public function destroy(User $user)
     {
-        // Delete user image if it exists
         if ($user->image && file_exists(public_path($user->image))) {
             unlink(public_path($user->image));
         }
+
+        /** 🔹 Activity Log */
+        $this->logActivity('Deleted user: ' . $user->name . ' (' . $user->email . ')');
 
         $user->delete();
 

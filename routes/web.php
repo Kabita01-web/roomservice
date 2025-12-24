@@ -5,7 +5,11 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\BlockReservationController;
+use App\Http\Controllers\UserReservationController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ActivityLogController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -16,66 +20,145 @@ Route::get('/', function () {
     ]);
 });
 
+
+
+
+
+    //-----------------------------------------
+    // Public Routes
+    //-----------------------------------------
+
+
+    //-----------------------------------------
+    // Home Page
+    //-----------------------------------------
+    Route::get('/',function(){
+        return Inertia::render('HomePage/Home');
+    });
+
+    //-----------------------------------------
+    // Privacy Policy Page
+    //-----------------------------------------
+
+    Route::get('/privacy-policy',function(){
+        return Inertia::render('MainPages/PrivacyPolicy');
+    });
+
+    //-----------------------------------------
+    // Terms and Conditions Page
+    //-----------------------------------------
+
+    Route::get('/terms-conditions',function(){
+        return Inertia::render('MainPages/TermsandConditions');
+    });
+
+    //-----------------------------------------
+    // Contact Page
+    //-----------------------------------------
+
+    Route::get('/contact',function(){
+        return Inertia::render('MainPages/Contact');
+    });
+
+    //-----------------------------------------
+    // Help Page
+    //-----------------------------------------
+
+    Route::get('/help',function(){
+        return Inertia::render('MainPages/Help');
+    });
+
+    //-----------------------------------------
+    // About Page
+    //-----------------------------------------
+
+    Route::get('/about',function(){
+        return Inertia::render('MainPages/About');
+    });
+
+    //-----------------------------------------
+    // Room Details Page with using Slug
+    //-----------------------------------------
+
+    Route::get('/room/{slug}',[PropertyController::class, 'showDetails'])->name('room.showDetails');
+
+    //-----------------------------------------
+    // Rooms Page
+    //-----------------------------------------
+
+    Route::get('/rooms',function(){
+        return Inertia::render('MainPages/Rooms');
+    });
+
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::middleware('auth')->group(function () {
-    // Dashboards
-    // In this section you can define all the admin routes that only authenticated users can access
 
+
+    //-----------------------------------------
+    // Only Authenticated Users Routes
+    //-----------------------------------------
+
+Route::middleware('auth')->group(function () {
+
+    //-----------------------------------------
+    // 
+    //-----------------------------------------
     Route::get('/activity-log',function(){
         return Inertia::render('AdminPages/ActivityLog');
     });
+
+    //-----------------------------------------
+    // 
+    //-----------------------------------------
 
     Route::get('/property',function(){
         return Inertia::render('AdminPages/Property');
     });
 
+    //-----------------------------------------
+    // 
+    //-----------------------------------------
+
     Route::get('/user-management',function(){
         return Inertia::render('AdminPages/UserManagement');
     });
+
+    //-----------------------------------------
+    // 
+    //-----------------------------------------
 
     Route::get('/settings',function(){
         return Inertia::render('AdminPages/Settings');
     });
 
+    //-----------------------------------------
+    // 
+    //-----------------------------------------
 
     Route::get('/dashboard',function(){
         return Inertia::render('AdminPages/Dashboard');
     });
 
+    //-----------------------------------------
+    // 
+    //-----------------------------------------
 
-    // Route::get('/',function(){
-    //     return Inertia::render('AdminPages/ActivityLog');
-    // });
+    Route::get('/block-reservation', function () {
+    return Inertia::render('AdminPages/BlockReservation');
+    });
+
+    //-----------------------------------------
+    // 
+    //-----------------------------------------
+
+    Route::get('/user-reservation', function () {
+    return Inertia::render('AdminPages/UserReservation');
+    });
+
 });
 
-
-Route::get('/',function(){
-    return Inertia::render('HomePage/Home');
-});
-
-
-Route::get('/privacy-policy',function(){
-    return Inertia::render('MainPages/PrivacyPolicy');
-});
-
-Route::get('/terms-conditions',function(){
-    return Inertia::render('MainPages/TermsandConditions');
-});
-Route::get('/contact',function(){
-    return Inertia::render('MainPages/Contact');
-});
-Route::get('/help',function(){
-    return Inertia::render('MainPages/Help');
-});
-Route::get('/about',function(){
-    return Inertia::render('MainPages/About');
-});
-Route::get('/room',function(){
-    return Inertia::render('MainPages/Room');
-});
 
 
 
@@ -86,16 +169,47 @@ Route::delete('/ourproperty/{id}', [PropertyController::class, 'destroy'])->name
 Route::delete('/ourproperty/image/{id}', [PropertyController::class, 'deleteImage'])->name('ourproperty.deleteImage');
 
 
+Route::get('/ourreservations/timeslots', [ReservationController::class, 'getTimeSlotsForCalendar'])->name('ourreservations.timeslots');
+Route::get('/ourreservations/availability', [ReservationController::class, 'checkAvailability'])->name('ourreservations.availability');
+Route::post('/ourreservations', [ReservationController::class, 'store'])->name('ourreservations.store');
+
+    Route::get('/calendar/{slug}', [PropertyController::class, 'testCalendar'])->name('calendar.show');
 
 
-Route::get('/ouruser', [UserController::class, 'index'])->name('ouruser.index');        // Get all ouruser
-Route::post('/ouruser', [UserController::class, 'store'])->name('ouruser.store');       // Create user
-Route::put('/ouruser/{user}', [UserController::class, 'update'])->name('ouruser.update'); // Update user
-Route::delete('/ouruser/{user}', [UserController::class, 'destroy'])->name('ouruser.destroy'); // Delete user
+    Route::get('/ourblockreservations', [BlockReservationController::class, 'index'])->name('ourblockreservations.index');
+    Route::post('/ourblockreservations', [BlockReservationController::class, 'store'])->name('ourblockreservations.store');
+    Route::put('/ourblockreservations/{id}', [BlockReservationController::class, 'update'])->name('ourblockreservations.update');
+    Route::delete('/ourblockreservations/{id}', [BlockReservationController::class, 'destroy'])->name('ourblockreservations.destroy');
+
+    Route::get('/ouruserreservations', [UserReservationController::class, 'index'])->name('ouruserreservations.index');
+    Route::post('/ouruserreservations', [UserReservationController::class, 'store'])->name('ouruserreservations.store');
+    Route::put('/ouruserreservations/{id}', [UserReservationController::class, 'update'])->name('ouruserreservations.update');
+    Route::delete('/ouruserreservations/{id}', [UserReservationController::class, 'destroy'])->name('ouruserreservations.destroy');
 
 
-Route::middleware(['auth', 'role:super admin'])->group(function () {
-    // In this you have to define all the routes that only super admin can access
+    //-----------------------------------------
+    // Admin Only Routes
+    //-----------------------------------------
+    Route::middleware(['auth', 'role:admin'])->group(function () {
+
+    //-----------------------------------------
+    // Activity Logs Routes
+    //-----------------------------------------
+
+    Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('ourlogs.index');  
+
+    //-----------------------------------------
+    // Our User Routes
+    //-----------------------------------------
+
+    Route::get('/ouruser', [UserController::class, 'index'])->name('ouruser.index');   
+    Route::post('/ouruser', [UserController::class, 'store'])->name('ouruser.store');      
+    Route::put('/ouruser/{user}', [UserController::class, 'update'])->name('ouruser.update'); 
+    Route::delete('/ouruser/{user}', [UserController::class, 'destroy'])->name('ouruser.destroy');
+       
+    //-----------------------------------------
+    // Our User Routes
+    //-----------------------------------------
 });
 
 require __DIR__.'/auth.php';

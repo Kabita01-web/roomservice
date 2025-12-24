@@ -1,4 +1,4 @@
-import { Facebook, Home, Instagram, Twitter, Youtube } from "lucide-react";
+import { Facebook, Instagram, Twitter, Youtube } from "lucide-react";
 import React from "react";
 
 function Footer() {
@@ -10,11 +10,31 @@ function Footer() {
           {/* Company Info */}
           <div className="flex-1 min-w-[200px]">
             <div className="flex flex-col">
-              <Home className="w-16 h-16 text-white" />
+              {/* Logo with image */}
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/logo1.jpeg" // Replace with your actual logo path
+                  alt="GharBhada Logo"
+                  className="w-16 h-16 object-contain"
+                />
+                <h1 className="text-white text-xl sm:text-2xl font-bold">
+                  GharBhada
+                </h1>
+              </div>
+              
+              {/* Alternative: Logo above text */}
+              {/* 
+              <img 
+                src="/logo1.png" 
+                alt="GharBhada Logo"
+                className="w-16 h-16 object-contain"
+              />
               <h1 className="text-white mt-3 text-xl sm:text-2xl font-bold">
                 GharBhada
               </h1>
-              <p className="text-gray-300 mt-2">
+              */}
+              
+              <p className="text-gray-300 mt-4">
                 If you have a property to rent or are looking for one, remember
                 Room Sewa.
               </p>
