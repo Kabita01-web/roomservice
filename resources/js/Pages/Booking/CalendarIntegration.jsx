@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import {
     Clock,
@@ -6,34 +6,13 @@ import {
     Calendar as CalendarIcon,
     Loader2,
     MapPin,
-    AlertCircle,
-    CheckCircle,
 } from "lucide-react";
-import { format, addDays, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import axios from "axios";
 import { Link } from "@inertiajs/react";
-import emailjs from "@emailjs/browser";
-import NavBar from "@/HomeComponents/NavBar";
-import Footer from "@/HomeComponents/Footer";
-
-// Helper functions defined outside component to avoid initialization order issues
-const isPastDate = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date < today;
-};
-
-const isSaturday = (date) => {
-    return date.getDay() === 6;
-};
 
 const CalendarIntegration = ({ property }) => {
-    const [selectedDate, setSelectedDate] = useState(() => {
-        // Start with today or next available day if today is Saturday
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return isSaturday(today) ? addDays(today, 2) : today;
-    });
+    const [selectedDate, setSelectedDate] = useState(new Date());
     const [selectedTime, setSelectedTime] = useState("");
     const [showNextAvailability, setShowNextAvailability] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
@@ -48,36 +27,6 @@ const CalendarIntegration = ({ property }) => {
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [nextAvailableDates, setNextAvailableDates] = useState([]);
     const [calendarData, setCalendarData] = useState({});
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
-
-    // EmailJS configuration
-    const serviceID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-    const templateID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-
-    // Utility functions
-    const getImageUrl = useCallback((image_path) => {
-        return image_path
-            ? `/storage/${image_path}`
-            : "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg";
-    }, []);
-
-    const convertTo24Hour = useCallback((time12h) => {
-        if (!time12h) return "";
-        const [time, modifier] = time12h.split(" ");
-        let [hours, minutes] = time.split(":");
-
-        if (hours === "12") {
-            hours = "00";
-        }
-
-        if (modifier === "PM") {
-            hours = parseInt(hours, 10) + 12;
-        }
-
-        return `${hours.toString().padStart(2, "0")}:${minutes}`;
-    }, []);
 
     // Fetch calendar data for next 30 days
     useEffect(() => {
@@ -93,29 +42,23 @@ const CalendarIntegration = ({ property }) => {
         }
     }, [property?.id, selectedDate]);
 
-    const fetchCalendarData = useCallback(async () => {
+    const fetchCalendarData = async () => {
         if (!property?.id) return;
 
         try {
             const response = await axios.get(
                 route("ourreservations.timeslots")
             );
-            
             if (response.data.success) {
                 setCalendarData(response.data.data);
 
-                // Find next available dates (skip Saturdays and past dates)
+                // Find next available dates
                 const today = new Date();
                 const nextDates = [];
-                const maxDaysToCheck = 60; // Increased to find more dates
 
-                for (let i = 1; i <= maxDaysToCheck; i++) {
+                for (let i = 1; i <= 30; i++) {
                     const nextDate = new Date(today);
                     nextDate.setDate(today.getDate() + i);
-                    
-                    // Skip Saturdays
-                    if (isSaturday(nextDate)) continue;
-                    
                     const dateKey = format(nextDate, "yyyy-MM-dd");
 
                     if (
@@ -124,29 +67,24 @@ const CalendarIntegration = ({ property }) => {
                     ) {
                         nextDates.push(new Date(nextDate));
 
-                        if (nextDates.length >= 5) { // Increased to show more options
+                        if (nextDates.length >= 3) {
                             break;
                         }
                     }
                 }
 
                 setNextAvailableDates(nextDates);
-            } else {
-                throw new Error("Failed to fetch calendar data");
             }
         } catch (error) {
             console.error("Error fetching calendar data:", error);
             setCalendarData({});
-            setError("Unable to load available dates. Please try again later.");
         }
-    }, [property?.id]);
+    };
 
-    const fetchAvailableSlots = useCallback(async (date) => {
+    const fetchAvailableSlots = async (date) => {
         if (!property?.id || !date) return;
 
         setLoadingSlots(true);
-        setSelectedTime("");
-        
         try {
             const response = await axios.get(
                 route("ourreservations.availability"),
@@ -157,20 +95,11 @@ const CalendarIntegration = ({ property }) => {
                 }
             );
 
-            // Handle Saturday message
             if (
                 response.data.message &&
                 response.data.message.includes("Saturday")
             ) {
                 setAvailableSlots([]);
-                setError("Saturday is closed. Please select another day.");
-                return;
-            }
-
-            // Check if we have available slots
-            if (!response.data.available_slots || response.data.available_slots.length === 0) {
-                setAvailableSlots([]);
-                setError("No time slots available for this date. Please select another date.");
                 return;
             }
 
@@ -180,28 +109,48 @@ const CalendarIntegration = ({ property }) => {
                 const hour = parseInt(hours);
                 const ampm = hour >= 12 ? "PM" : "AM";
                 const displayHour = hour % 12 || 12;
-                return {
-                    display: `${displayHour}:${minutes} ${ampm}`,
-                    value: time
-                };
+                return `${displayHour}:${minutes} ${ampm}`;
             });
 
             setAvailableSlots(formattedSlots);
-            setError(""); // Clear any previous errors
         } catch (error) {
             console.error("Error fetching slots:", error);
             setAvailableSlots([]);
-            setError("Unable to load time slots. Please try again.");
         } finally {
             setLoadingSlots(false);
         }
-    }, [property?.id]);
+    };
 
-    const hasTimeSlots = useCallback((date) => {
+    const convertTo24Hour = (time12h) => {
+        const [time, modifier] = time12h.split(" ");
+        let [hours, minutes] = time.split(":");
+
+        if (hours === "12") {
+            hours = "00";
+        }
+
+        if (modifier === "PM") {
+            hours = parseInt(hours, 10) + 12;
+        }
+
+        return `${hours.toString().padStart(2, "0")}:${minutes}`;
+    };
+
+    const hasTimeSlots = (date) => {
         if (!date) return false;
         const dateKey = format(date, "yyyy-MM-dd");
         return calendarData[dateKey] && calendarData[dateKey].length > 0;
-    }, [calendarData]);
+    };
+
+    const isPastDate = (date) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return date < today;
+    };
+
+    const isSaturday = (date) => {
+        return date.getDay() === 6;
+    };
 
     const handleNextAvailabilityClick = () => {
         setShowNextAvailability(true);
@@ -211,20 +160,17 @@ const CalendarIntegration = ({ property }) => {
         setSelectedDate(date);
         setSelectedTime("");
         setShowNextAvailability(false);
-        setError("");
     };
 
     const handleNext = () => {
-        if (currentStep < 2 && !isNextDisabled()) {
+        if (currentStep < 2) {
             setCurrentStep(currentStep + 1);
-            setError("");
         }
     };
 
     const handleBack = () => {
         if (currentStep > 1) {
             setCurrentStep(currentStep - 1);
-            setError("");
         }
     };
 
@@ -232,96 +178,31 @@ const CalendarIntegration = ({ property }) => {
         const { name, value } = e.target;
         setTenantDetails((prev) => ({
             ...prev,
-            [name]: value.trim(),
+            [name]: value,
         }));
-    };
-
-    const validateForm = () => {
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(tenantDetails.email)) {
-            return "Please enter a valid email address";
-        }
-
-        // Phone validation (basic)
-        const phoneRegex = /^[+]?[\d\s\-()]{10,}$/;
-        if (!phoneRegex.test(tenantDetails.phone.replace(/\s/g, ''))) {
-            return "Please enter a valid phone number";
-        }
-
-        // Required fields
-        if (!tenantDetails.name.trim()) {
-            return "Name is required";
-        }
-
-        if (!tenantDetails.address.trim()) {
-            return "Address is required";
-        }
-
-        return null;
-    };
-
-    const sendBookingEmail = async () => {
-        if (!serviceID || !templateID || !publicKey) {
-            console.warn("EmailJS configuration missing");
-            return; // Don't fail the booking if email fails
-        }
-
-        const emailParams = {
-            to_name: "Property Manager",
-            from_name: tenantDetails.name,
-            name: tenantDetails.name,
-            phone: tenantDetails.phone,
-            email: tenantDetails.email,
-            address: tenantDetails.address,
-            property_title: property.title,
-            booking_date: format(selectedDate, "EEEE, MMMM d, yyyy"),
-            booking_time: selectedTime,
-            property_location: property.location,
-            property_price: `Rs. ${property.price?.toLocaleString() || "0"}`,
-        };
-
-        try {
-            await emailjs.send(serviceID, templateID, emailParams, publicKey);
-            console.log("Email sent successfully");
-        } catch (emailError) {
-            console.error("Email sending failed:", emailError);
-            // Don't throw error - booking should still succeed
-        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!property || !property.id) {
-            setError("Property information is missing. Please try again.");
-            return;
-        }
-
-        // Validate form
-        const validationError = validateForm();
-        if (validationError) {
-            setError(validationError);
+            alert("Property information is missing. Please try again.");
             return;
         }
 
         setIsLoading(true);
-        setError("");
-        setSuccess("");
 
         try {
-            // 1️⃣ Save booking in backend
             const bookingData = {
                 user_name: tenantDetails.name,
                 email: tenantDetails.email,
                 phone: tenantDetails.phone,
                 address: tenantDetails.address,
-                package_type: property.property_type,
+                package_type: "Physical Tour",
                 reservation_date: format(selectedDate, "yyyy-MM-dd"),
                 reservation_time: convertTo24Hour(selectedTime),
                 property_id: property.id,
-                property_title: property.title,
-                property_location: property.location,
+                agent_id: null, // No agent selection
             };
 
             const response = await axios.post(
@@ -330,47 +211,35 @@ const CalendarIntegration = ({ property }) => {
             );
 
             if (response.data.message) {
-                // 2️⃣ Send Email (don't block on failure)
-                await sendBookingEmail();
+                alert(
+                    "Booking request submitted successfully! Our team will contact you soon."
+                );
 
-                // 3️⃣ Show success message
-                setSuccess("Booking successful! You will receive a confirmation email shortly.");
+                // Reset form
+                setCurrentStep(1);
+                setTenantDetails({
+                    name: "",
+                    phone: "",
+                    email: "",
+                    address: "",
+                });
+                setSelectedTime("");
+                setSelectedDate(new Date());
 
-                // 4️⃣ Reset state after delay
-                setTimeout(() => {
-                    setCurrentStep(1);
-                    setTenantDetails({
-                        name: "",
-                        phone: "",
-                        email: "",
-                        address: "",
-                    });
-                    setSelectedTime("");
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    setSelectedDate(isSaturday(today) ? addDays(today, 2) : today);
-                    setSuccess("");
-                    
-                    // Refresh calendar data
-                    fetchCalendarData();
-                }, 3000);
-
+                // Refresh data
+                fetchCalendarData();
+                fetchAvailableSlots(new Date());
             } else {
                 throw new Error(response.data.error || "Booking failed");
             }
         } catch (error) {
-            console.error("Booking failed:", error);
-            
-            let errorMessage = "Booking submission failed. Please try again.";
+            console.error("Error submitting booking:", error);
+
             if (error.response?.data?.error) {
-                errorMessage = error.response.data.error;
-            } else if (error.response?.data?.errors) {
-                // Handle Laravel validation errors
-                const errors = Object.values(error.response.data.errors).flat();
-                errorMessage = errors.join(", ");
+                alert(`Booking failed: ${error.response.data.error}`);
+            } else {
+                alert("Booking submission failed. Please try again.");
             }
-            
-            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -382,31 +251,31 @@ const CalendarIntegration = ({ property }) => {
                 return !selectedDate || !selectedTime;
             case 2:
                 return (
-                    !tenantDetails.name.trim() ||
-                    !tenantDetails.phone.trim() ||
-                    !tenantDetails.email.trim() ||
-                    !tenantDetails.address.trim()
+                    !tenantDetails.name ||
+                    !tenantDetails.phone ||
+                    !tenantDetails.email ||
+                    !tenantDetails.address
                 );
             default:
-                return true;
+                return false;
         }
     };
 
     // Custom day cell content
     const renderDayContent = (date) => {
         const hasSlots = hasTimeSlots(date);
-        const isSelected = selectedDate && isSameDay(date, selectedDate);
+        const isSelected =
+            selectedDate && date.toDateString() === selectedDate.toDateString();
         const isPast = isPastDate(date);
         const isSat = isSaturday(date);
 
         return (
-            <div className="relative flex items-center justify-center w-full h-full">
-                <span className={`relative z-10 ${isSelected ? "text-white" : 
-                    isPast || isSat ? "text-gray-300" : "text-gray-700"}`}>
+            <div className="relative">
+                <span className={`${isPast || isSat ? "text-gray-400" : ""}`}>
                     {date.getDate()}
                 </span>
                 {hasSlots && !isSelected && !isPast && !isSat && (
-                    <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full"></div>
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full"></div>
                 )}
             </div>
         );
@@ -432,7 +301,6 @@ const CalendarIntegration = ({ property }) => {
                                     </p>
                                 )}
                             </div>
-                            
                             <Calendar
                                 mode="single"
                                 selected={selectedDate}
@@ -445,25 +313,17 @@ const CalendarIntegration = ({ property }) => {
                                         setSelectedDate(date);
                                         setSelectedTime("");
                                         setShowNextAvailability(false);
-                                        setError("");
                                     }
                                 }}
                                 disabled={(date) =>
                                     isPastDate(date) || isSaturday(date)
                                 }
-                                className="rounded-md border [&_.rdp-day_selected]:bg-emerald-600 [&_.rdp-day_selected]:text-white [&_.rdp-day_selected:hover]:bg-emerald-700 [&_.rdp-button:hover]:bg-emerald-50 [&_.rdp-day_today]:bg-gray-100 [&_.rdp-day_today]:border [&_.rdp-day_today]:border-emerald-200"
+                                className="rounded-md border [&_.rdp-day_selected]:bg-emerald-600 [&_.rdp-day_selected]:text-white [&_.rdp-day_selected:hover]:bg-emerald-700 [&_.rdp-button:hover]:bg-emerald-50 [&_.rdp-day_today]:bg-gray-100"
                                 components={{
                                     DayContent: ({ date }) =>
                                         renderDayContent(date),
                                 }}
                             />
-                            
-                            {isSaturday(selectedDate) && (
-                                <p className="mt-3 text-sm text-amber-600 flex items-center gap-1">
-                                    <AlertCircle className="w-4 h-4" />
-                                    Saturday is closed. Please select another day.
-                                </p>
-                            )}
                         </div>
 
                         {/* Time Slots Section */}
@@ -488,28 +348,27 @@ const CalendarIntegration = ({ property }) => {
                                     </p>
                                 </div>
                             ) : loadingSlots ? (
-                                <div className="flex flex-col items-center justify-center py-8">
-                                    <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mb-2" />
-                                    <span className="text-gray-600">
-                                        Loading available slots...
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                                    <span className="ml-2 text-gray-600">
+                                        Loading slots...
                                     </span>
                                 </div>
                             ) : availableSlots.length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 sm:gap-3">
-                                    {availableSlots.map((slot) => (
+                                    {availableSlots.map((time) => (
                                         <button
-                                            key={slot.value}
-                                            onClick={() => {
-                                                setSelectedTime(slot.display);
-                                                setError("");
-                                            }}
+                                            key={time}
+                                            onClick={() =>
+                                                setSelectedTime(time)
+                                            }
                                             className={`py-2 sm:py-3 px-3 sm:px-4 rounded-lg border-2 transition-all duration-200 font-medium text-sm sm:text-base ${
-                                                selectedTime === slot.display
-                                                    ? "border-emerald-600 bg-emerald-600 text-white shadow-md transform scale-[1.02]"
+                                                selectedTime === time
+                                                    ? "border-emerald-600 bg-emerald-600 text-white shadow-md"
                                                     : "border-gray-200 hover:border-emerald-300 text-gray-700 hover:bg-emerald-50"
                                             }`}
                                         >
-                                            {slot.display}
+                                            {time}
                                         </button>
                                     ))}
                                 </div>
@@ -527,7 +386,9 @@ const CalendarIntegration = ({ property }) => {
 
                                     {!showNextAvailability ? (
                                         <button
-                                            onClick={handleNextAvailabilityClick}
+                                            onClick={
+                                                handleNextAvailabilityClick
+                                            }
                                             className="w-full py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors duration-200 text-sm"
                                         >
                                             Check Next Availability
@@ -537,30 +398,46 @@ const CalendarIntegration = ({ property }) => {
                                             <h3 className="text-sm font-semibold text-gray-900 mb-3 text-left">
                                                 Next available dates:
                                             </h3>
-                                            <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                                                {nextAvailableDates.length > 0 ? (
-                                                    nextAvailableDates.map((date, index) => (
+                                            <div className="space-y-2">
+                                                {nextAvailableDates.map(
+                                                    (date, index) => (
                                                         <button
                                                             key={index}
                                                             onClick={() =>
-                                                                handleSelectNextAvailableDate(date)
+                                                                handleSelectNextAvailableDate(
+                                                                    date
+                                                                )
                                                             }
-                                                            className="w-full py-2 px-3 text-left bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors duration-200 hover:border-emerald-300"
+                                                            className="w-full py-2 px-3 text-left bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors duration-200"
                                                         >
                                                             <div className="text-sm font-medium text-gray-900">
-                                                                {format(date, "EEEE, MMMM d")}
+                                                                {format(
+                                                                    date,
+                                                                    "EEE, MMM d"
+                                                                )}
                                                             </div>
                                                             <div className="text-xs text-gray-600">
-                                                                {calendarData[format(date, "yyyy-MM-dd")]?.length || 0} time slots available
+                                                                {calendarData[
+                                                                    format(
+                                                                        date,
+                                                                        "yyyy-MM-dd"
+                                                                    )
+                                                                ]?.length ||
+                                                                    0}{" "}
+                                                                time slots
+                                                                available
                                                             </div>
                                                         </button>
-                                                    ))
-                                                ) : (
-                                                    <p className="text-gray-500 text-sm py-2">
-                                                        No available dates found in the next 60 days.
-                                                    </p>
+                                                    )
                                                 )}
                                             </div>
+                                            {nextAvailableDates.length ===
+                                                0 && (
+                                                <p className="text-gray-500 text-sm py-2">
+                                                    No available dates found in
+                                                    the next 30 days.
+                                                </p>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -578,69 +455,64 @@ const CalendarIntegration = ({ property }) => {
                                     <div>
                                         <div className="w-full h-48 rounded-lg overflow-hidden mb-4">
                                             <img
-                                                src={getImageUrl(property?.image_path?.[0])}
-                                                alt={property?.title}
-                                                className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                                                onError={(e) => {
-                                                    e.target.src = "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg";
-                                                }}
+                                                src={
+                                                    property.images?.[0]
+                                                        ?.image_path ||
+                                                    "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg"
+                                                }
+                                                alt={property.title}
+                                                className="w-full h-full object-cover"
                                             />
                                         </div>
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex-1 mr-4">
+                                        <div className="flex items-start justify-between mb-3 uppercase">
+                                            <div>
                                                 <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base line-clamp-2">
                                                     {property.title}
                                                 </h3>
                                                 <div className="flex items-center text-xs sm:text-sm text-gray-600">
                                                     <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
-                                                    <span className="line-clamp-1">
+                                                    <span className="line-clamp-1 uppercase">
                                                         {property.location}
                                                     </span>
                                                 </div>
                                             </div>
-                                            <span className="bg-gray-100 text-gray-700 text-xs font-semibold px-2 py-1 rounded whitespace-nowrap">
-                                                {property.property_type}
-                                            </span>
+                                           <h2 className="uppercase">{property.property_type}</h2>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <div className="text-lg font-bold text-rose-600">
-                                                Rs. {property.price?.toLocaleString() || "0"}
+                                                Rs.{" "}
+                                                {property.price?.toLocaleString() ||
+                                                    "0"}
                                             </div>
                                             <div className="text-xs text-gray-500">
-                                                {property.bedrooms} Beds • {property.bathrooms} Baths
+                                                {property.bedrooms} Beds •{" "}
+                                                {property.bathrooms} Baths
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {selectedDate && selectedTime && (
-                                    <div className="border-t pt-4 mt-4">
-                                        <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                                            Selected Appointment
-                                        </h4>
-                                        <div className="flex justify-between items-center">
-                                            <div className="text-sm text-gray-600">
-                                                <div className="flex items-center gap-1">
-                                                    <CalendarIcon className="w-4 h-4" />
-                                                    <span>{format(selectedDate, "MMM d, yyyy")}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1 mt-1">
-                                                    <Clock className="w-4 h-4" />
-                                                    <span>{selectedTime}</span>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedTime("");
-                                                    setError("");
-                                                }}
-                                                className="text-xs text-red-600 hover:text-red-800"
-                                            >
-                                                Clear
-                                            </button>
-                                        </div>
+                                <div className="border-t pt-4">
+                                    <div className="flex justify-between text-xs sm:text-sm mb-2">
+                                        <span className="text-gray-600">
+                                            Agent Fee:
+                                        </span>
+                                        <span className="font-medium text-gray-900">
+                                            FREE
+                                        </span>
                                     </div>
-                                )}
+                                    {selectedDate && selectedTime && (
+                                        <div className="flex justify-between text-xs sm:text-sm">
+                                            <span className="text-gray-600">
+                                                Selected:
+                                            </span>
+                                            <span className="font-medium text-gray-900 text-right">
+                                                {format(selectedDate, "MMM d")}{" "}
+                                                at {selectedTime}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <button
@@ -648,11 +520,13 @@ const CalendarIntegration = ({ property }) => {
                                 disabled={!selectedTime}
                                 className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base ${
                                     selectedTime
-                                        ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                        ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg"
+                                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
                                 }`}
                             >
-                                {selectedTime ? "Continue to Details →" : "Select a Time"}
+                                {selectedTime
+                                    ? "Continue to Details"
+                                    : "Select a Time"}
                             </button>
 
                             {selectedTime && (
@@ -669,11 +543,9 @@ const CalendarIntegration = ({ property }) => {
                     <>
                         {/* Tenant Details Form */}
                         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:col-span-2">
-                            <div className="flex items-center gap-2 mb-1">
-                                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                                    Your Details
-                                </h2>
-                            </div>
+                            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1">
+                                Your Details
+                            </h2>
                             <p className="text-xs sm:text-sm text-gray-500 mb-6">
                                 Fill in your details to complete the booking
                             </p>
@@ -691,7 +563,7 @@ const CalendarIntegration = ({ property }) => {
                                             onChange={handleInputChange}
                                             required
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                                            placeholder="John Doe"
+                                            placeholder="Enter your full name"
                                         />
                                     </div>
 
@@ -706,7 +578,7 @@ const CalendarIntegration = ({ property }) => {
                                             onChange={handleInputChange}
                                             required
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                                            placeholder="+1234567890"
+                                            placeholder="Enter your phone number"
                                         />
                                     </div>
 
@@ -721,14 +593,14 @@ const CalendarIntegration = ({ property }) => {
                                             onChange={handleInputChange}
                                             required
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                                            placeholder="john@example.com"
+                                            placeholder="Enter your email address"
                                         />
                                     </div>
                                 </div>
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Complete Address *
+                                        Address *
                                     </label>
                                     <textarea
                                         name="address"
@@ -736,12 +608,9 @@ const CalendarIntegration = ({ property }) => {
                                         onChange={handleInputChange}
                                         rows="3"
                                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                                        placeholder="Street, City, State, ZIP Code"
+                                        placeholder="Your complete address..."
                                         required
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Please provide your complete address for confirmation purposes
-                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -756,25 +625,28 @@ const CalendarIntegration = ({ property }) => {
                                 {property && (
                                     <div className="border-b pb-4">
                                         <div className="flex items-start gap-3 mb-3">
-                                            <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
+                                            <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
                                                 <img
-                                                    src={getImageUrl(property?.image_path?.[0])}
-                                                    alt={property?.title}
+                                                    src={
+                                                        property.images?.[0]
+                                                            ?.image_path ||
+                                                        "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg"
+                                                    }
+                                                    alt={property.title}
                                                     className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        e.target.src = "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg";
-                                                    }}
                                                 />
                                             </div>
-                                            <div className="flex-1">
-                                                <h4 className="font-medium text-gray-900 text-sm mb-1">
+                                            <div>
+                                                <h4 className="font-medium text-gray-900 text-sm">
                                                     {property.title}
                                                 </h4>
-                                                <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                                                <p className="text-xs text-gray-600">
                                                     {property.location}
                                                 </p>
-                                                <div className="text-sm font-bold text-rose-600">
-                                                    Rs. {property.price?.toLocaleString() || "0"}
+                                                <div className="text-sm font-bold text-rose-600 mt-1">
+                                                    Rs.{" "}
+                                                    {property.price?.toLocaleString() ||
+                                                        "0"}
                                                 </div>
                                             </div>
                                         </div>
@@ -782,145 +654,131 @@ const CalendarIntegration = ({ property }) => {
                                 )}
 
                                 <div className="space-y-3">
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-gray-600">Date</span>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">
+                                            Date
+                                        </span>
                                         <span className="font-medium text-gray-900">
-                                            {format(selectedDate, "MMM d, yyyy")}
+                                            {format(
+                                                selectedDate,
+                                                "MMM d, yyyy"
+                                            )}
                                         </span>
                                     </div>
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-gray-600">Time</span>
-                                        <span className="font-medium  text-emerald-700 px-2 py-1 rounded">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">
+                                            Time
+                                        </span>
+                                        <span className="font-medium text-emerald-600">
                                             {selectedTime}
                                         </span>
                                     </div>
-                                </div>
-                            </div>
 
-                            {/* Error and Success Messages */}
-                            {error && (
-                                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                    <p className="text-sm text-red-700 flex items-center gap-1">
-                                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                        <span>{error}</span>
-                                    </p>
-                                </div>
-                            )}
-
-                            {success && (
-                                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                    <p className="text-sm text-green-700 flex items-center gap-1">
-                                        <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                                        <span>{success}</span>
-                                    </p>
-                                </div>
-                            )}
-
-                            <div className="space-y-3">
-                                <button
-                                    onClick={handleSubmit}
-                                    disabled={isNextDisabled() || isLoading}
-                                    className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base ${
-                                        !isNextDisabled() && !isLoading
-                                            ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                    }`}
-                                >
-                                    {isLoading ? (
-                                        <div className="flex items-center justify-center">
-                                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                            Processing...
+                                    {/* <div className="pt-4 border-t">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <div className="font-semibold text-gray-900">
+                                                    Total Cost
+                                                </div>
+                                                <div className="text-xs text-gray-600">
+                                                    No charges for viewing
+                                                </div>
+                                            </div>
+                                            <div className="text-2xl font-bold text-green-600">
+                                                FREE
+                                            </div>
                                         </div>
-                                    ) : (
-                                        "Confirm & Book Appointment"
-                                    )}
-                                </button>
-
-                                {!isNextDisabled() && !isLoading && (
-                                    <p className="text-xs text-center text-gray-500">
-                                        You'll receive a confirmation email after booking
-                                    </p>
-                                )}
+                                    </div> */}
+                                </div>
                             </div>
+
+                            <button
+                                onClick={handleSubmit}
+                                disabled={isNextDisabled() || isLoading}
+                                className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base ${
+                                    !isNextDisabled() && !isLoading
+                                        ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg"
+                                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                }`}
+                            >
+                                {isLoading ? (
+                                    <div className="flex items-center justify-center">
+                                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                        Processing...
+                                    </div>
+                                ) : !isNextDisabled() ? (
+                                    "Confirm & Book Appointment"
+                                ) : (
+                                    "Complete All Fields"
+                                )}
+                            </button>
+
+                            {!isNextDisabled() && !isLoading && (
+                                <p className="text-xs text-center text-gray-500 mt-3">
+                                    You'll receive a confirmation email after
+                                    booking
+                                </p>
+                            )}
                         </div>
                     </>
                 );
         }
     };
 
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">
+                        Loading booking information...
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <>
-        <NavBar/>
-        <div className="min-h-screen bg-gray-50 mt-24">
+        <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
                 {/* Back Button */}
-                {/* <Link
-                    href={"/rooms"}
-                    className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors group"
+                <Link
+                    href={"/pro"}
+                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
                 >
-                    <ChevronLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
+                    <ChevronLeft size={20} />
                     <span className="font-medium">Back to Properties</span>
-                </Link> */}
+                </Link>
 
                 {/* Steps Header */}
                 <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 mb-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                         <div>
-                            {/* <div className="flex items-center gap-3 mb-2">
-                                <div className="flex items-center">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 1 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                                        1
-                                    </div>
-                                    <div className="w-12 h-0.5 mx-2 bg-gray-300"></div>
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 2 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                                        2
-                                    </div>
-                                </div>
-                                <span className="text-sm font-medium text-gray-600">
-                                    {currentStep === 1 ? "Select Date & Time" : "Enter Details"}
-                                </span>
-                            </div> */}
                             {property && (
-                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                                    Book a Viewing: <span className="text-emerald-700">{property.title}</span>
-                                </h1>
+                                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                                    Booking for:{" "}
+                                    <span className="font-semibold">
+                                        {property.title}
+                                    </span>
+                                </p>
                             )}
                         </div>
-                        
-                        {currentStep === 2 && selectedTime && (
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2">
-                                <p className="text-sm text-emerald-800">
-                                    <span className="font-semibold">{format(selectedDate, "MMM d")}</span> at{" "}
-                                    <span className="font-semibold">{selectedTime}</span>
-                                </p>
-                            </div>
-                        )}
                     </div>
-                    
                     <p className="text-gray-600 text-sm sm:text-base">
-                        {currentStep === 1
-                            ? "Check our availability and select a convenient date and time for your property viewing"
-                            : "Almost there! Please provide your contact details to confirm the appointment"}
+                        {currentStep === 1 &&
+                            "Check out our availability and book the date and time that works for you"}
+                        {currentStep === 2 &&
+                            "Fill in your details to confirm the booking"}
                     </p>
                 </div>
 
-                {/* Error Message Display */}
-                {error && !success && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-red-700 flex items-center gap-2">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                            {error}
-                        </p>
-                    </div>
-                )}
-
                 {/* Step Content */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                     {renderStepContent()}
                 </div>
 
                 {/* Navigation Buttons */}
-                <div className="mt-8 flex justify-between items-center">
+                <div className="mt-6 flex justify-between items-center">
                     <button
                         onClick={handleBack}
                         disabled={currentStep === 1}
@@ -933,18 +791,9 @@ const CalendarIntegration = ({ property }) => {
                         <ChevronLeft className="w-4 h-4" />
                         Back
                     </button>
-                    
-                    <div className="text-sm text-gray-500">
-                        Need help? Contact us at{" "}
-                        <a href="mailto:support@property.com" className="text-emerald-600 hover:text-emerald-800">
-                            support@property.com
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>
-        <Footer/>
-        </>
     );
 };
 

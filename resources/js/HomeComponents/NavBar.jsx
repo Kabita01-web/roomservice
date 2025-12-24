@@ -83,7 +83,7 @@ function NavBar() {
         if (!user) return "/dashboard";
         
         switch (user.role) {
-            case "super_admin":
+            case "admin":
                 return "/dashboard";
             case "admin":
                 return "/admin-dashboard";
@@ -99,7 +99,7 @@ function NavBar() {
         if (!user) return "/settings";
         
         switch (user.role) {
-            case "super_admin":
+            case "admin":
             case "admin":
                 return "/admin-setting";
             case "customer":
@@ -173,52 +173,8 @@ function NavBar() {
                     </Link>
 
                     {/* Dropdown Menu */}
-                    <div className="relative" ref={dropdownRef}>
-                        <button
-                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                            className={navLinkClass()}
-                        >
-                            Listing
-                            <ChevronDown
-                                className={`w-4 h-4 transition-transform duration-200 ${
-                                    isDropdownOpen ? "rotate-180" : ""
-                                }`}
-                            />
-                        </button>
-
-                        {isDropdownOpen && (
-                            <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
-                                <Link
-                                    href="/listings/apartments"
-                                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    onClick={() => setIsDropdownOpen(false)}
-                                >
-                                    Apartments
-                                </Link>
-                                <Link
-                                    href="/listings/houses"
-                                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    onClick={() => setIsDropdownOpen(false)}
-                                >
-                                    Houses
-                                </Link>
-                                <Link
-                                    href="/listings/rooms"
-                                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    onClick={() => setIsDropdownOpen(false)}
-                                >
-                                    Rooms
-                                </Link>
-                                <Link
-                                    href="/listings/commercial"
-                                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    onClick={() => setIsDropdownOpen(false)}
-                                >
-                                    Commercial
-                                </Link>
-                            </div>
-                        )}
-                    </div>
+                   
+                              
 
                     <Link href="/rooms" className={navLinkClass()}>
                         Room
